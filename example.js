@@ -23,6 +23,7 @@ wsServer.on('connection', function(wsClient) {
 		return '1.0';
 	});
 
+	wsClient.sendEvent('testEvent', {data: 'test'});
 });
 
 ws.on('open', function() {
@@ -45,3 +46,6 @@ ws.onRequest('ping', function() {
 	});
 });
 
+ws.onEvent('testEvent', function(ev) {
+	console.log('Got event', ev);
+});

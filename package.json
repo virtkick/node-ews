@@ -1,0 +1,38 @@
+{
+  "name": "ews",
+  "version": "1.0.0",
+  "description": "Extended web wockets based on ws module. Provides more events and response capability.",
+  "main": "ews.js",
+  "scripts": {
+    "test": "mocha test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/virtkick/node-ews.git"
+  },
+  "keywords": [
+    "web",
+    "wockets",
+    "ews",
+    "response",
+    "rpc",
+    "events",
+    "websocket"
+  ],
+  "author": "Damian Kaczmarek <rush@virtkick.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/virtkick/node-ews/issues"
+  },
+  "homepage": "https://github.com/virtkick/node-ews",
+  "dependencies": {
+    "bluebird": "^2.9.14",
+    "node-uuid": "^1.4.3",
+    "ws": "^0.7.1"
+  },
+  "devDependencies": {
+    "chai": "^2.1.2",
+    "mocha": "^2.2.1",
+    "should": "^5.2.0"
+  }
+}

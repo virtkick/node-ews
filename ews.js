@@ -26,7 +26,12 @@ function WebSocket(wsInstance) {
   this.wsClient.on('message', function(msg) {
     var obj = JSON.parse(msg);
     try {
-      self.emit('message', obj);
+	    try {
+        self.emit('message', obj);
+      } catch(err) {
+        console.error(err.stack || err);
+        self.emit('messageError', err, msg);
+      }
       if(obj.type) {
         if(obj.uuid) {
           self.emit('request:'+obj.type, obj.data, function(error, responseData) {
@@ -54,7 +59,8 @@ function WebSocket(wsInstance) {
         }
       }
     } catch(err) {
-      self.emit('messageParseError', err, msg);
+      console.error(err.stack || err);
+      self.emit('messageError', err, msg);
     }
   });
 

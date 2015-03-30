@@ -6,7 +6,6 @@ var Promise = require('bluebird').Promise;
 var WebSocket = require('./ews');
 
 describe('ews module', function() {
-
   var ws, wss, wsServer;
 
   beforeEach(function(cb) {
@@ -28,7 +27,6 @@ describe('ews module', function() {
   });
 
   it('should work with casual web socket usage', function(endTest) {
-
     ws.send('test');
     ws.on('message', function(msg) {
       msg.should.equal('test-reply');
@@ -128,5 +126,21 @@ describe('ews module', function() {
     setTimeout(function() {
       endTest();
     }, 10);
+  });
+
+  it('should handle errors inside message handler', function(endTest) {
+    ws.sendEvent('test');
+
+    var tmp = console.error;
+    console.error = function(msg) {
+    };
+    wsServer.on('message', function(msg) {
+      throw new Error('test error');
+    });
+
+    wsServer.onEvent('test', function() {
+      console.error = tmp;
+      endTest();
+    });
   });
 });

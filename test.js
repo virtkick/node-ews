@@ -21,7 +21,9 @@ describe('ews module', function() {
     ws.on('open', cb);
   });
   afterEach(function() {
-    wss.close();
+  	if(wss) {
+      wss.close();
+  	}
     assert.deepEqual(ws.requestMap, {});
     assert.deepEqual(wsServer.requestMap, {});
   });
@@ -140,6 +142,13 @@ describe('ews module', function() {
 
     wsServer.onEvent('test', function() {
       console.error = tmp;
+      endTest();
+    });
+  });
+
+  it('should emit close events', function(endTest) {
+    wss.close();
+    wsServer.on('close', function() {
       endTest();
     });
   });

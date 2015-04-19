@@ -67,6 +67,9 @@ function WebSocket(wsInstance) {
   this.wsClient.on('open', function() {
     self.emit('open');
   });
+  this.wsClient.on('close', function() {
+  	self.emit('close');
+  })
 }
 
 util.inherits(WebSocket, EventEmitter);

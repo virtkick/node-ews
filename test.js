@@ -83,13 +83,24 @@ describe('ews module', function() {
     });
   });
 
-  it('should send exceptions requests through promise handlers', function(endTest) {
+  it('should send exceptions through promise handlers', function(endTest) {
     ws.sendRequest('test', {code: 42}, function(err, res) {
       err.should.equal("foo");
       endTest();
     });
     wsServer.onRequest('test', function(data) {
       throw "foo";
+    });
+  });
+
+
+  it('should send Error exceptions through promise handlers', function(endTest) {
+    ws.sendRequest('test', {code: 42}, function(err, res) {
+      err.message.should.equal('error with stacktrace');
+      endTest();
+    });
+    wsServer.onRequest('test', function(data) {
+      throw new Error('error with stacktrace');
     });
   });
 

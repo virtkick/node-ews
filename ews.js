@@ -26,7 +26,7 @@ function WebSocket(wsInstance) {
   this.wsClient.on('message', function(msg) {
     var obj = JSON.parse(msg);
     try {
-	    try {
+      try {
         self.emit('message', obj);
       } catch(err) {
         console.error(err.stack || err);
@@ -35,6 +35,12 @@ function WebSocket(wsInstance) {
       if(obj.type) {
         if(obj.uuid) {
           self.emit('request:'+obj.type, obj.data, function(error, responseData) {
+            if(error && error instanceof Error) {
+              error = {
+                message: error.message,
+                stack: error.stack
+              };
+            }
             self.send({
               error: error,
               type: obj.type,
@@ -68,7 +74,7 @@ function WebSocket(wsInstance) {
     self.emit('open');
   });
   this.wsClient.on('close', function() {
-  	self.emit('close');
+    self.emit('close');
   })
 }
 

@@ -21,9 +21,9 @@ describe('ews module', function() {
     ws.on('open', cb);
   });
   afterEach(function() {
-  	if(wss) {
+    if(wss) {
       wss.close();
-  	}
+    }
     assert.deepEqual(ws.requestMap, {});
     assert.deepEqual(wsServer.requestMap, {});
   });
@@ -83,6 +83,16 @@ describe('ews module', function() {
     });
   });
 
+  it('should send exceptions requests through promise handlers', function(endTest) {
+    ws.sendRequest('test', {code: 42}, function(err, res) {
+      err.should.equal("foo");
+      endTest();
+    });
+    wsServer.onRequest('test', function(data) {
+      throw "foo";
+    });
+  });
+
   it('should handle timeout errors', function(endTest) {
     ws.setResponseTimeout(10);
 
@@ -134,7 +144,7 @@ describe('ews module', function() {
     ws.sendEvent('test');
 
     var tmp = console.error;
-    console.error = function(msg) {
+      console.error = function(msg) {
     };
     wsServer.on('message', function(msg) {
       throw new Error('test error');

@@ -75,7 +75,10 @@ function WebSocket(wsInstance) {
   });
   this.wsClient.on('close', function() {
     self.emit('close');
-  })
+  });
+  this.wsClient.on('error', function() {
+    self.emit('error');
+  });
 }
 
 util.inherits(WebSocket, EventEmitter);

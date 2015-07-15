@@ -9,7 +9,7 @@ function newCall(Cls, args) {
   return new (Function.prototype.bind.apply(Cls, args));
 }
 
-function WebSocket(wsInstance) {  
+function WebSocket(wsInstance) {
   var args = Array.prototype.slice.call(arguments);
   EventEmitter.call(this);
 
@@ -76,8 +76,8 @@ function WebSocket(wsInstance) {
   this.wsClient.on('close', function() {
     self.emit('close');
   });
-  this.wsClient.on('error', function() {
-    self.emit('error');
+  this.wsClient.on('error', function(err) {
+    self.emit('error', err);
   });
 }
 
@@ -122,7 +122,7 @@ WebSocket.prototype.sendRequest = function(type, data, cb) {
 function makeRequestHandler(cb) {
   return function requestHandler(data, responseCb) {
     Promise.method(cb)(data).nodeify(responseCb);
-  }
+  };
 }
 
 WebSocket.prototype.onRequest = function(name, cb) {
@@ -192,13 +192,21 @@ function WebSocketServer() {
 
 util.inherits(WebSocketServer, EventEmitter);
 
-function forwardCall(name) {
+function forwardCallServer(name) {
   WebSocketServer.prototype[name] = function() {
-    this.wsServer[name].call(this.wsServer, arguments);
+    this.wsServer[name].apply(this.wsServer, arguments);
   };
 }
 
-forwardCall('close');
+forwardCallServer('close');
+
+function forwardCallClient(name) {
+  WebSocket.prototype[name] = function() {
+    this.wsClient[name].apply(this.wsClient, arguments);
+  };
+}
+
+forwardCallClient('close');
 
 WebSocket.Server = WebSocketServer;
 module.exports = WebSocket;

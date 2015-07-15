@@ -167,10 +167,41 @@ describe('ews module', function() {
     });
   });
 
-  it('should emit close events', function(endTest) {
-    wss.close();
-    wsServer.on('close', function() {
-      endTest();
+  describe('WebSocketServer', function() {
+    it('should emit close events', function(endTest) {
+      wss.close();
+      wsServer.on('close', function() {
+        endTest();
+      });
+    });
+  });
+
+  describe('WebSocket', function() {
+    it('should emit close events from client', function(endTest) {
+      ws.close(1000);
+      wsServer.on('close', function() {
+        endTest();
+      });
+    });
+    it('should emit close events from server', function(endTest) {
+      wsServer.close(1000);
+      ws.on('close', function() {
+        endTest();
+      });
+    });
+    it('should emit an error if closing with bad error number', function(endTest) {
+      ws.once('error', function(err) {
+        err.message.should.match(/first argument must be a valid error code number/);
+        endTest();
+      });
+      ws.close(0);
+    });
+    it('should emit an error if closing from server with bad error number', function(endTest) {
+      wsServer.once('error', function(err) {
+        err.message.should.match(/first argument must be a valid error code number/);
+        endTest();
+      });
+      wsServer.close(0);
     });
   });
 });

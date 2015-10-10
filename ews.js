@@ -3,6 +3,15 @@ var util = require('util');
 var Promise = require('bluebird').Promise;
 var uuid = require('node-uuid');
 var EventEmitter = require('events').EventEmitter;
+var util = require('util');
+
+function RemoteError(message, extra) {
+  Error.captureStackTrace(this, this.constructor);
+  this.name = this.constructor.name;
+  this.message = message;
+  this.extra = extra;
+}
+util.inherits(RemoteError, Error);
 
 function newCall(Cls, args) {
   args.unshift(null);
@@ -38,7 +47,8 @@ function WebSocket(wsInstance) {
             if(error && error instanceof Error) {
               error = {
                 message: error.message,
-                stack: error.stack
+                stack: error.stack,
+                name: error.name
               };
             }
             self.send({
@@ -98,7 +108,7 @@ WebSocket.prototype.sendRequest = function(type, data, cb) {
       uuid: uuid.v4()
     };
     self.send(obj, function ack(error) {
-      if(error) reject(error);
+      if(error) return reject(error);
        // sent successfuly, wait for response
 
       requestMap[obj.uuid] = function(data) {
@@ -113,6 +123,15 @@ WebSocket.prototype.sendRequest = function(type, data, cb) {
   })).timeout(self.responseTimeout).catch(Promise.TimeoutError, function(err) {
     delete requestMap[obj.uuid];
     throw err;
+  }).catch(function(err) {
+    if(! (err instanceof Error) && err.message && err.stack) {
+      var errInstance = new RemoteError(err.message);
+      errInstance.name = 'Remote::' + err.name;
+      errInstance.stack = err.stack;
+      throw errInstance;
+    } else {
+      throw err;
+    }
   })
   .nodeify(cb);
 };
@@ -209,4 +228,5 @@ function forwardCallClient(name) {
 forwardCallClient('close');
 
 WebSocket.Server = WebSocketServer;
+WebSocket.RemoteError = RemoteError;
 module.exports = WebSocket;

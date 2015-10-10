@@ -3,6 +3,8 @@ var assert = require('chai').assert;
 
 var Promise = require('bluebird').Promise;
 
+Promise.longStackTraces();
+
 var WebSocket = require('./ews');
 
 describe('ews module', function() {
@@ -37,7 +39,7 @@ describe('ews module', function() {
 
     wsServer.on('message', function(msg) {
       wsServer.send('test-reply');
-    })
+    });
   });
 
   it('should send JSON requests through basic API', function(endTest) {
@@ -95,12 +97,23 @@ describe('ews module', function() {
 
 
   it('should send Error exceptions through promise handlers', function(endTest) {
-    ws.sendRequest('test', {code: 42}, function(err, res) {
+    ws.sendRequest('test', {code: 42}).then(function(res) {
+      //endTest();
+    }).catch(WebSocket.RemoteError, function(err) {
+      err.should.be.an.instanceOf(Error);
       err.message.should.equal('error with stacktrace');
+      return Promise.resolve().then(function() {
+        throw err;
+      });
+    }).catch(WebSocket.RemoteError, function(err) {
+      err.stack.should.match(/remoteFunc/);
       endTest();
     });
     wsServer.onRequest('test', function(data) {
-      throw new Error('error with stacktrace');
+      function remoteFunc() {
+        throw new Error('error with stacktrace');
+      }
+      return Promise.resolve().then(remoteFunc);
     });
   });
 

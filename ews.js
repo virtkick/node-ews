@@ -101,12 +101,14 @@ WebSocket.prototype.sendRequest = function(type, data, cb) {
   var self = this;
   var obj;
   var requestMap = this.requestMap;
+  var originalStack = (new Error().stack).replace(/^Error\n/,'');
   return (new Promise(function(resolve, reject) {
     obj = {
       type: type,
       data: data,
       uuid: uuid.v4()
     };
+
     self.send(obj, function ack(error) {
       if(error) return reject(error);
        // sent successfuly, wait for response
@@ -127,7 +129,10 @@ WebSocket.prototype.sendRequest = function(type, data, cb) {
     if(! (err instanceof Error) && err.message && err.stack) {
       var errInstance = new RemoteError(err.message);
       errInstance.name = 'Remote::' + err.name;
-      errInstance.stack = err.stack;
+      errInstance.stack = err.stack + '\n' + 'From previous event:\n' + originalStack;
+      if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
+        console.error(errInstance.stack);
+      }
       throw errInstance;
     } else {
       throw err;

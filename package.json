@@ -1,6 +1,6 @@
 {
   "name": "ews",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Extended web wockets based on ws module. Provides more events and response capability.",
   "main": "ews.js",
   "scripts": {

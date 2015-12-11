@@ -1,9 +1,10 @@
-var ws = require('ws');
-var util = require('util');
-var Promise = require('bluebird').Promise;
-var uuid = require('node-uuid');
-var EventEmitter = require('events').EventEmitter;
-var util = require('util');
+'use strict';
+
+let ws = require('ws');
+let util = require('util');
+let Promise = require('bluebird').Promise;
+let uuid = require('node-uuid');
+let EventEmitter = require('events').EventEmitter;
 
 function RemoteError(message, extra) {
   Error.captureStackTrace(this, this.constructor);
@@ -19,31 +20,30 @@ function newCall(Cls, args) {
 }
 
 function WebSocket(wsInstance) {
-  var args = Array.prototype.slice.call(arguments);
+  let args = Array.prototype.slice.call(arguments);
   EventEmitter.call(this);
 
   this.responseTimeout = 10000;
 
-  var requestMap = this.requestMap  = {};
+  let requestMap = this.requestMap  = {};
 
-  var self = this;
   if(wsInstance && wsInstance instanceof ws) {
     this.wsClient = wsInstance;
   } else {
     this.wsClient = newCall(ws, args);
   }
-  this.wsClient.on('message', function(msg) {
-    var obj = JSON.parse(msg);
+  this.wsClient.on('message', msg => {
+    let obj = JSON.parse(msg);
     try {
       try {
-        self.emit('message', obj);
+        this.emit('message', obj);
       } catch(err) {
         console.error(err.stack || err);
-        self.emit('messageError', err, msg);
+        this.emit('messageError', err, msg);
       }
       if(obj.type) {
         if(obj.uuid) {
-          self.emit('request:'+obj.type, obj.data, function(error, responseData) {
+          this.emit('request:'+obj.type, obj.data, (error, responseData) => {
             if(error && error instanceof Error) {
               error = {
                 message: error.message,
@@ -51,12 +51,18 @@ function WebSocket(wsInstance) {
                 name: error.name
               };
             }
-            self.send({
-              error: error,
-              type: obj.type,
-              response: obj.uuid,
-              data: responseData
-            });
+            try {
+              this.send({
+                error: error,
+                type: obj.type,
+                response: obj.uuid,
+                data: responseData
+              });
+            } catch(err) {
+              if(err.message !== 'not opened') {
+                throw err;
+              }
+            }
           });
         } else if(obj.response) {
           if(requestMap[obj.response]) {
@@ -71,23 +77,23 @@ function WebSocket(wsInstance) {
             console.error('Got response without a request', obj.response);
           }
         } else {
-          self.emit('event:'+obj.type, obj.data);
+          this.emit('event:'+obj.type, obj.data);
         }
       }
     } catch(err) {
       console.error(err.stack || err);
-      self.emit('messageError', err, msg);
+      this.emit('messageError', err, msg);
     }
   });
 
-  this.wsClient.on('open', function() {
-    self.emit('open');
+  this.wsClient.on('open', () => {
+    this.emit('open');
   });
-  this.wsClient.on('close', function() {
-    self.emit('close');
+  this.wsClient.on('close', () => {
+    this.emit('close');
   });
-  this.wsClient.on('error', function(err) {
-    self.emit('error', err);
+  this.wsClient.on('error', err => {
+    this.emit('error', err);
   });
 }
 
@@ -98,18 +104,17 @@ WebSocket.prototype.send = function(msg, cb) {
 };
 
 WebSocket.prototype.sendRequest = function(type, data, cb) {
-  var self = this;
-  var obj;
-  var requestMap = this.requestMap;
-  var originalStack = (new Error().stack).replace(/^Error\n/,'');
-  return (new Promise(function(resolve, reject) {
+  let obj;
+  let requestMap = this.requestMap;
+  let originalStack = (new Error().stack).replace(/^Error\n/,'');
+  return (new Promise((resolve, reject) => {
     obj = {
       type: type,
       data: data,
       uuid: uuid.v4()
     };
 
-    self.send(obj, function ack(error) {
+    this.send(obj, function ack(error) {
       if(error) return reject(error);
        // sent successfuly, wait for response
 
@@ -122,12 +127,12 @@ WebSocket.prototype.sendRequest = function(type, data, cb) {
         delete requestMap[obj.uuid];
       };
     });
-  })).timeout(self.responseTimeout).catch(Promise.TimeoutError, function(err) {
+  })).timeout(this.responseTimeout).catch(Promise.TimeoutError, err => {
     delete requestMap[obj.uuid];
     throw err;
-  }).catch(function(err) {
+  }).catch(err => {
     if(! (err instanceof Error) && err.message && err.stack) {
-      var errInstance = new RemoteError(err.message);
+      let errInstance = new RemoteError(err.message);
       errInstance.name = 'Remote::' + err.name;
       errInstance.stack = err.stack + '\n' + 'From previous event:\n' + originalStack;
       if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
@@ -184,31 +189,29 @@ WebSocket.prototype.setResponseTimeout = function(timeout) {
 };
 
 WebSocket.prototype.sendEvent = function(type, data, cb) {
-  var self = this;
-  return (new Promise(function(resolve, reject) {
-    var obj = {
+  return (new Promise((resolve, reject) => {
+    let obj = {
       type: type,
       data: data
     };
-    self.send(obj);
+    this.send(obj);
   })).nodeify(cb);
 };
 
 function WebSocketServer() {
-  var args = Array.prototype.slice.call(arguments);
+  let args = Array.prototype.slice.call(arguments);
   EventEmitter.call(this);
 
-  var self = this;
   this.wsServer = newCall(ws.Server, args);
-  this.wsServer.on('connection', function(ws) {
-    self.emit('connection', new WebSocket(ws));
+  this.wsServer.on('connection', ws => {
+    this.emit('connection', new WebSocket(ws));
   });
 
-  function forwardEventsFor(eventName) {
-    self.wsServer.on(eventName, function() {
-      var args = Array.prototype.slice.call(arguments);
+  let forwardEventsFor = eventName => {
+    this.wsServer.on(eventName, () => {
+      let args = Array.prototype.slice.call(arguments);
       args.unshift(eventName);
-      self.emit.apply(self, args);
+      this.emit.apply(this, args);
     });
   }
   forwardEventsFor('listening');

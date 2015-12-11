@@ -8,7 +8,7 @@ Promise.longStackTraces();
 var WebSocket = require('./ews');
 
 describe('ews module', function() {
-  var ws, wss, wsServer;
+  var ws, wss, wsServer, cancelRequestCheck;
 
   beforeEach(function(cb) {
     ws = new WebSocket('ws://localhost:23200', {
@@ -21,13 +21,16 @@ describe('ews module', function() {
       wsServer = ws;
     });
     ws.on('open', cb);
+    cancelRequestCheck = false;
   });
   afterEach(function() {
     if(wss) {
       wss.close();
     }
-    assert.deepEqual(ws.requestMap, {});
-    assert.deepEqual(wsServer.requestMap, {});
+    if(!cancelRequestCheck) {
+      assert.deepEqual(ws.requestMap, {});
+      assert.deepEqual(wsServer.requestMap, {});
+    }
   });
 
   it('should work with casual web socket usage', function(endTest) {
@@ -177,6 +180,19 @@ describe('ews module', function() {
     wsServer.onEvent('test', function() {
       console.error = tmp;
       endTest();
+    });
+  });
+  
+  it('should not break if remote party suddenly dies', function(endTest) {
+    ws.sendRequest('test1', {code: 42}).then(function(res) {
+      res.should.equal('foo');
+    });
+    
+    wsServer.onRequest('test1', function(data) {
+      return Promise.delay(20).then(function() {
+        cancelRequestCheck = true;
+        ws.close();
+      }).delay(20).then(endTest);
     });
   });
 

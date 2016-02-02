@@ -1,3 +1,5 @@
+'use strict';
+
 require('should');
 var assert = require('chai').assert;
 
@@ -33,7 +35,7 @@ describe('ews module', function() {
     }
   });
 
-  it('should work with casual web socket usage', function(endTest) {
+  it('should work with casual web socket usage', endTest => {
     ws.send('test');
     ws.on('message', function(msg) {
       msg.should.equal('test-reply');
@@ -45,7 +47,7 @@ describe('ews module', function() {
     });
   });
 
-  it('should send JSON requests through basic API', function(endTest) {
+  it('should send JSON requests through basic API', endTest => {
     ws.sendRequest('test1', {code: 42}, function(err, res) {
       res.should.equal('foo');
 
@@ -66,7 +68,7 @@ describe('ews module', function() {
   });
 
   it('should send JSON requests through promise request handlers',
-    function(endTest) {
+    endTest => {
     ws.sendRequest('test1', {code: 42}, function(err, res) {
       res.should.equal('foo');
 
@@ -87,8 +89,19 @@ describe('ews module', function() {
       }));
     });
   });
+  
+  it('should send an error if request is not handled', endTest => {
+    ws.sendRequest('test1', {code: 42}).catch(err => {
+      if(err.message.match(/No handler for request: test1/)) {
+        endTest();
+      } else {
+        throw err;
+      }
+    });
+  });
+  
 
-  it('should send exceptions through promise handlers', function(endTest) {
+  it('should send exceptions through promise handlers', endTest => {
     ws.sendRequest('test', {code: 42}, function(err, res) {
       err.should.equal("foo");
       endTest();
@@ -99,7 +112,7 @@ describe('ews module', function() {
   });
 
 
-  it('should send Error exceptions through promise handlers', function(endTest) {
+  it('should send Error exceptions through promise handlers', endTest => {
     ws.sendRequest('test', {code: 42}).then(function(res) {
       //endTest();
     }).catch(WebSocket.RemoteError, function(err) {
@@ -120,7 +133,7 @@ describe('ews module', function() {
     });
   });
 
-  it('should handle timeout errors', function(endTest) {
+  it('should handle timeout errors', endTest => {
     ws.setResponseTimeout(10);
 
     var gotTimeout = false;
@@ -141,7 +154,7 @@ describe('ews module', function() {
     });
   });
 
-  it('should send events', function(endTest) {
+  it('should send events', endTest => {
     ws.sendEvent('test', {
       code: 'foo'
     });
@@ -152,7 +165,7 @@ describe('ews module', function() {
     });
   });
 
-  it('should not send events when removed', function(endTest) {
+  it('should not send events when removed', endTest => {
     ws.sendEvent('test', {
       code: 'foo'
     });
@@ -167,7 +180,7 @@ describe('ews module', function() {
     }, 10);
   });
 
-  it('should handle errors inside message handler', function(endTest) {
+  it('should handle errors inside message handler', endTest => {
     ws.sendEvent('test');
 
     var tmp = console.error;
@@ -183,7 +196,7 @@ describe('ews module', function() {
     });
   });
   
-  it('should not break if remote party suddenly dies', function(endTest) {
+  it('should not break if remote party suddenly dies', endTest => {
     ws.sendRequest('test1', {code: 42}).then(function(res) {
       res.should.equal('foo');
     });
@@ -197,7 +210,7 @@ describe('ews module', function() {
   });
 
   describe('WebSocketServer', function() {
-    it('should emit close events', function(endTest) {
+    it('should emit close events', endTest => {
       wss.close();
       wsServer.on('close', function() {
         endTest();
@@ -206,26 +219,26 @@ describe('ews module', function() {
   });
 
   describe('WebSocket', function() {
-    it('should emit close events from client', function(endTest) {
+    it('should emit close events from client', endTest => {
       ws.close(1000);
       wsServer.on('close', function() {
         endTest();
       });
     });
-    it('should emit close events from server', function(endTest) {
+    it('should emit close events from server', endTest => {
       wsServer.close(1000);
       ws.on('close', function() {
         endTest();
       });
     });
-    it('should emit an error if closing with bad error number', function(endTest) {
+    it('should emit an error if closing with bad error number', endTest => {
       ws.once('error', function(err) {
         err.message.should.match(/first argument must be a valid error code number/);
         endTest();
       });
       ws.close(0);
     });
-    it('should emit an error if closing from server with bad error number', function(endTest) {
+    it('should emit an error if closing from server with bad error number', endTest => {
       wsServer.once('error', function(err) {
         err.message.should.match(/first argument must be a valid error code number/);
         endTest();

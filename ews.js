@@ -19,6 +19,20 @@ function newCall(Cls, args) {
   return new (Function.prototype.bind.apply(Cls, args));
 }
 
+function constructRealError(originalStack, err) {
+  if(! (err instanceof Error) && err.message && err.stack) {
+    let errInstance = new RemoteError(err.message);
+    errInstance.name = 'Remote::' + err.name;
+    errInstance.stack = err.stack + '\n' + 'From previous event:\n' + originalStack;
+    if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
+      console.error(errInstance.stack);
+    }
+    return errInstance;
+  } else {
+    return err;
+  }
+}
+
 class WebSocket extends EventEmitter{
   constructor(wsInstance) {
     let args = Array.prototype.slice.call(arguments);
@@ -129,25 +143,15 @@ class WebSocket extends EventEmitter{
           delete requestMap[obj.uuid];
         };
         requestMap[obj.uuid].error = function(error) {
-          reject(error);
+          reject(constructRealError(originalStack, error));
           delete requestMap[obj.uuid];
         };
       });
     })).timeout(this.responseTimeout).catch(Promise.TimeoutError, err => {
       delete requestMap[obj.uuid];
       throw err;
-    }).catch(err => {
-      if(! (err instanceof Error) && err.message && err.stack) {
-        let errInstance = new RemoteError(err.message);
-        errInstance.name = 'Remote::' + err.name;
-        errInstance.stack = err.stack + '\n' + 'From previous event:\n' + originalStack;
-        if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
-          console.error(errInstance.stack);
-        }
-        throw errInstance;
-      } else {
-        throw err;
-      }
+    }).catch(error => {
+      throw constructRealError(originalStack, error);
     })
     .nodeify(cb);
   }

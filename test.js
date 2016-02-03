@@ -110,6 +110,45 @@ describe('ews module', function() {
       throw "foo";
     });
   });
+  
+  it('should not send Timeout after disconnected from server', endTest => {
+    ws.setResponseTimeout(10);
+    
+    let timeout = setTimeout(() => {
+      endTest();
+    }, 15);
+    
+    ws.sendRequest('test', {code: 42}, function(err, res) {
+      clearTimeout(timeout);
+      if(err) endTest(err);
+    });
+    setTimeout(() => {
+      wsServer.close();
+    }, 5);
+    wsServer.onRequest('test', function(data) {
+      return new Promise((resolve, reject) => {});
+    });
+    
+  });
+
+  it('should not send Timeout after disconnected from client', endTest => {
+    ws.setResponseTimeout(10);
+    
+    let timeout = setTimeout(() => {
+      endTest();
+    }, 15);
+    
+    ws.sendRequest('test', {code: 42}, function(err, res) {
+      clearTimeout(timeout);
+      if(err) endTest(err);
+    });
+    setTimeout(() => {
+      ws.close();
+    }, 5);
+    wsServer.onRequest('test', function(data) {
+      return new Promise((resolve, reject) => {});
+    });
+  });
 
 
   it('should send Error exceptions through promise handlers', endTest => {

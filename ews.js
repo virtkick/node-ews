@@ -123,6 +123,11 @@ class WebSocket extends EventEmitter{
     this.wsClient.send(JSON.stringify(msg), cb);
   }
   
+  isClosed() {
+    return this.wsClient.readyState === ws.CLOSED ||
+      this.wsClient.readyState === ws.CLOSING;
+  }
+  
   sendRequest(type, data, cb) {
     let obj;
     let requestMap = this.requestMap;
@@ -149,6 +154,10 @@ class WebSocket extends EventEmitter{
       });
     })).timeout(this.responseTimeout).catch(Promise.TimeoutError, err => {
       delete requestMap[obj.uuid];
+      if(this.isClosed()) {
+        // never resolve, this shouldn't leak as bluebird has no global state
+        return new Promise((resolve, reject) => {});
+      }
       throw err;
     }).catch(error => {
       throw constructRealError(originalStack, error);
@@ -199,6 +208,10 @@ class WebSocket extends EventEmitter{
       this.send(obj);
     })).nodeify(cb);
   }
+  
+  close() {
+    this.wsClient.close.apply(this.wsClient, arguments);
+  }
 }
 
 function makeRequestHandler(cb) {
@@ -236,14 +249,6 @@ function forwardCallServer(name) {
 }
 
 forwardCallServer('close');
-
-function forwardCallClient(name) {
-  WebSocket.prototype[name] = function() {
-    this.wsClient[name].apply(this.wsClient, arguments);
-  };
-}
-
-forwardCallClient('close');
 
 WebSocket.Server = WebSocketServer;
 WebSocket.RemoteError = RemoteError;

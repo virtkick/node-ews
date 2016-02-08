@@ -122,8 +122,9 @@ describe('ews module', function() {
     });
   });
   
+  
   it('should send real exceptions through promise handlers with custom exception hook', endTest => {
-    wss.setRemoteErrorHook(err => {
+    wsServer.setRemoteErrorHook(err => {
       err.name = 'FooBar';
       return Promise.resolve(err).delay(1);
     });

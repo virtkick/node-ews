@@ -35,8 +35,8 @@ class WebSocket extends EventEmitter{
     } else {
       resolvedError = err;
     }
-    if(this.server && this.server.remoteErrorHook) {
-      return Promise.resolve(this.server.remoteErrorHook(resolvedError));
+    if(this.remoteErrorHook) {
+      resolvedError = this.remoteErrorHook(resolvedError);
     }
     return Promise.resolve(resolvedError);
   }
@@ -217,6 +217,10 @@ class WebSocket extends EventEmitter{
   close() {
     this.wsClient.close.apply(this.wsClient, arguments);
   }
+  
+  setRemoteErrorHook(hook) {
+    this.remoteErrorHook = hook;
+  }
 }
 
 function makeRequestHandler(cb) {
@@ -228,7 +232,6 @@ function makeRequestHandler(cb) {
 class WebSocketServer extends EventEmitter {
   constructor() {
     super();
-    this.setRemoteErrorHook(err => err);
     
     let args = Array.prototype.slice.call(arguments);
     EventEmitter.call(this);
@@ -248,9 +251,6 @@ class WebSocketServer extends EventEmitter {
       });
     };
     forwardEventsFor('listening');
-  }
-  setRemoteErrorHook(hook) {
-    this.remoteErrorHook = hook;
   }
 }
 

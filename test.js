@@ -111,6 +111,35 @@ describe('ews module', function() {
     });
   });
   
+  it('should send real exceptions through promise handlers', endTest => {
+    ws.sendRequest('test', {code: 42}, function(err, res) {
+      err.name.should.equal('Remote::Error');
+      err.message.should.equal("foo");
+      endTest();
+    });
+    wsServer.onRequest('test', function(data) {
+      throw new Error('foo');
+    });
+  });
+  
+  it('should send real exceptions through promise handlers with custom exception hook', endTest => {
+    wss.setRemoteErrorHook(err => {
+      err.name = 'FooBar';
+      return Promise.resolve(err).delay(1);
+    });
+  
+    wsServer.sendRequest('test', {code: 42}, function(err, res) {
+      err.name.should.equal('FooBar');
+      err.should.be.instanceof(WebSocket.RemoteError);
+      err.message.should.equal("foo");
+      endTest();
+    });
+    
+    ws.onRequest('test', function(data) {
+      throw new Error('foo');
+    });
+  });
+  
   it('should not send Timeout after disconnected from server', endTest => {
     ws.setResponseTimeout(10);
     

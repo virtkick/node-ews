@@ -1,39 +1,46 @@
 'use strict';
 
 let ws = require('ws');
-let util = require('util');
 let Promise = require('bluebird').Promise;
 let uuid = require('node-uuid');
 let EventEmitter = require('events').EventEmitter;
 
-function RemoteError(message, extra) {
-  Error.captureStackTrace(this, this.constructor);
-  this.name = this.constructor.name;
-  this.message = message;
-  this.extra = extra;
+class RemoteError extends Error {
+  constructor(message, extra) {
+    super(message, extra);
+    Error.captureStackTrace(this, this.constructor.name);
+    this.name = this.constructor.name;
+    this.message = message;
+    this.extra = extra;
+  }
 }
-util.inherits(RemoteError, Error);
 
 function newCall(Cls, args) {
   args.unshift(null);
   return new (Function.prototype.bind.apply(Cls, args));
 }
 
-function constructRealError(originalStack, err) {
-  if(! (err instanceof Error) && err.message && err.stack) {
-    let errInstance = new RemoteError(err.message);
-    errInstance.name = 'Remote::' + err.name;
-    errInstance.stack = err.stack + '\n' + 'From previous event:\n' + originalStack;
-    if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
-      console.error(errInstance.stack);
-    }
-    return errInstance;
-  } else {
-    return err;
-  }
-}
-
 class WebSocket extends EventEmitter{
+  constructRealError(originalStack, err) {
+    let resolvedError;
+    if(! (err instanceof Error) && err.message && err.stack) {
+      let errInstance = new RemoteError(err.message);
+      errInstance.name = 'Remote::' + err.name;
+      let constructedStack = err.stack + '\n' + 'From previous event:\n' + originalStack;
+      errInstance.stack = constructedStack;
+      if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
+        console.error(errInstance.stack);
+      }
+      resolvedError = errInstance;
+    } else {
+      resolvedError = err;
+    }
+    if(this.server && this.server.remoteErrorHook) {
+      return Promise.resolve(this.server.remoteErrorHook(resolvedError));
+    }
+    return Promise.resolve(resolvedError);
+  }
+  
   constructor(wsInstance) {
     let args = Array.prototype.slice.call(arguments);
     super();
@@ -139,17 +146,17 @@ class WebSocket extends EventEmitter{
         uuid: uuid.v4()
       };
 
-      this.send(obj, function ack(error) {
+      this.send(obj, error => {
         if(error) return reject(error);
          // sent successfuly, wait for response
 
-        requestMap[obj.uuid] = function(data) {
+        requestMap[obj.uuid] = data => {
+          delete requestMap[obj.uuid];
           resolve(data);
-          delete requestMap[obj.uuid];
         };
-        requestMap[obj.uuid].error = function(error) {
-          reject(constructRealError(originalStack, error));
+        requestMap[obj.uuid].error = error => {
           delete requestMap[obj.uuid];
+          this.constructRealError(originalStack, error).then(reject);
         };
       });
     })).timeout(this.responseTimeout).catch(Promise.TimeoutError, err => {
@@ -159,8 +166,6 @@ class WebSocket extends EventEmitter{
         return new Promise((resolve, reject) => {});
       }
       throw err;
-    }).catch(error => {
-      throw constructRealError(originalStack, error);
     })
     .nodeify(cb);
   }
@@ -194,7 +199,7 @@ class WebSocket extends EventEmitter{
     else
       this.removeAllListeners('request:' + name);
   }
-  
+    
   setResponseTimeout(timeout) {
     this.responseTimeout = parseInt(timeout);
   }
@@ -223,12 +228,16 @@ function makeRequestHandler(cb) {
 class WebSocketServer extends EventEmitter {
   constructor() {
     super();
+    this.setRemoteErrorHook(err => err);
+    
     let args = Array.prototype.slice.call(arguments);
     EventEmitter.call(this);
 
     this.wsServer = newCall(ws.Server, args);
     this.wsServer.on('connection', ws => {
-      this.emit('connection', new WebSocket(ws));
+      let ewsSocket = new WebSocket(ws);
+      ewsSocket.server = this;
+      this.emit('connection', ewsSocket);
     });
     
     let forwardEventsFor = eventName => {
@@ -239,6 +248,9 @@ class WebSocketServer extends EventEmitter {
       });
     };
     forwardEventsFor('listening');
+  }
+  setRemoteErrorHook(hook) {
+    this.remoteErrorHook = hook;
   }
 }
 

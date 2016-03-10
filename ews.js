@@ -1,9 +1,10 @@
 'use strict';
 
 let ws = require('ws');
-let Promise = require('bluebird').Promise;
+let Promise = require('bluebird');
 let uuid = require('node-uuid');
 let EventEmitter = require('events').EventEmitter;
+require('promise-resolve-deep')(Promise);
 
 class RemoteError extends Error {
   constructor(message, extra) {
@@ -146,18 +147,20 @@ class WebSocket extends EventEmitter{
         uuid: uuid.v4()
       };
 
-      this.send(obj, error => {
-        if(error) return reject(error);
-         // sent successfuly, wait for response
+      Promise.resolveDeep(data).then(() => {
+        this.send(obj, error => {
+          if(error) return reject(error);
+           // sent successfuly, wait for response
 
-        requestMap[obj.uuid] = data => {
-          delete requestMap[obj.uuid];
-          resolve(data);
-        };
-        requestMap[obj.uuid].error = error => {
-          delete requestMap[obj.uuid];
-          this.constructRealError(originalStack, error).then(reject);
-        };
+          requestMap[obj.uuid] = data => {
+            delete requestMap[obj.uuid];
+            resolve(data);
+          };
+          requestMap[obj.uuid].error = error => {
+            delete requestMap[obj.uuid];
+            this.constructRealError(originalStack, error).then(reject);
+          };
+        });
       });
     })).timeout(this.responseTimeout).catch(Promise.TimeoutError, err => {
       delete requestMap[obj.uuid];
@@ -225,7 +228,8 @@ class WebSocket extends EventEmitter{
 
 function makeRequestHandler(cb) {
   return function requestHandler(data, responseCb) {
-    Promise.method(cb)(data).nodeify(responseCb);
+    Promise.resolve().then(() => Promise.resolveDeep(cb(data)))
+      .nodeify(responseCb);
   };
 }
 

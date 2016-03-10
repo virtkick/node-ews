@@ -89,6 +89,24 @@ describe('ews module', function() {
       }));
     });
   });
+
+  it('should send JSON requests through promise request handlers with nested promises',
+    endTest => {
+    ws.sendRequest('test1', {code: Promise.resolve(42)}, function(err, res) {
+      assert.deepEqual(res, {
+        foo: ['bar', 'foo']
+      })
+      endTest();
+    });
+
+    wsServer.onRequest('test1', function(data) {
+      assert.deepEqual(data, {code: 42});
+      
+      return Promise.resolve({
+        foo: [Promise.resolve('bar'), 'foo']
+      });
+    });
+  });
   
   it('should send an error if request is not handled', endTest => {
     ws.sendRequest('test1', {code: 42}).catch(err => {

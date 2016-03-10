@@ -1,6 +1,6 @@
 {
   "name": "ews",
-  "version": "1.1.6",
+  "version": "1.2.0",
   "description": "Extended web wockets based on ws module. Provides more events and response capability.",
   "main": "ews.js",
   "scripts": {
@@ -28,6 +28,7 @@
   "dependencies": {
     "bluebird": "^3.1.1",
     "node-uuid": "^1.4.3",
+    "promise-resolve-deep": "^1.0.0",
     "ws": "^1.0.1"
   },
   "devDependencies": {

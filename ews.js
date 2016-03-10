@@ -140,14 +140,15 @@ class WebSocket extends EventEmitter{
     let obj;
     let requestMap = this.requestMap;
     let originalStack = (new Error().stack).replace(/^Error\n/,'');
-    return (new Promise((resolve, reject) => {
-      obj = {
-        type: type,
-        data: data,
-        uuid: uuid.v4()
-      };
+    return Promise.resolveDeep(data).then(() => {
+      return (new Promise((resolve, reject) => {
+        obj = {
+          type: type,
+          data: data,
+          uuid: uuid.v4()
+        };
 
-      Promise.resolveDeep(data).then(() => {
+        
         this.send(obj, error => {
           if(error) return reject(error);
            // sent successfuly, wait for response
@@ -161,16 +162,16 @@ class WebSocket extends EventEmitter{
             this.constructRealError(originalStack, error).then(reject);
           };
         });
-      });
-    })).timeout(this.responseTimeout).catch(Promise.TimeoutError, err => {
-      delete requestMap[obj.uuid];
-      if(this.isClosed()) {
-        // never resolve, this shouldn't leak as bluebird has no global state
-        return new Promise((resolve, reject) => {});
-      }
-      throw err;
-    })
-    .nodeify(cb);
+      })).timeout(this.responseTimeout).catch(Promise.TimeoutError, err => {
+        delete requestMap[obj.uuid];
+        if(this.isClosed()) {
+          // never resolve, this shouldn't leak as bluebird has no global state
+          return new Promise((resolve, reject) => {});
+        }
+        throw err;
+      })
+      .nodeify(cb);
+    });
   }
   
   onRequest(name, cb) {

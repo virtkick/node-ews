@@ -136,9 +136,15 @@ class WebSocket extends EventEmitter{
       this.wsClient.readyState === ws.CLOSING;
   }
   
-  sendRequest(type, data, cb) {
+  sendRequest(type, data, opts, cb) {
     let obj;
+    opts = opts || {};
+    if(typeof opts === 'function') {
+      cb = opts;
+      opts = {};
+    }
     let requestMap = this.requestMap;
+    let responseTimeout = opts.responseTimeout || this.responseTimeout;
     let originalStack = (new Error().stack).replace(/^Error\n/,'');
     return Promise.resolveDeep(data).then(() => {
       return (new Promise((resolve, reject) => {
@@ -162,7 +168,7 @@ class WebSocket extends EventEmitter{
             this.constructRealError(originalStack, error).then(reject);
           };
         });
-      })).timeout(this.responseTimeout).catch(Promise.TimeoutError, err => {
+      })).timeout(responseTimeout).catch(Promise.TimeoutError, err => {
         delete requestMap[obj.uuid];
         if(this.isClosed()) {
           // never resolve, this shouldn't leak as bluebird has no global state

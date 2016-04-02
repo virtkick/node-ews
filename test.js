@@ -160,11 +160,11 @@ describe('ews module', function() {
   });
   
   it('should not send Timeout after disconnected from server', endTest => {
-    ws.setResponseTimeout(10);
+    ws.setResponseTimeout(20);
     
     let timeout = setTimeout(() => {
       endTest();
-    }, 15);
+    }, 30);
     
     ws.sendRequest('test', {code: 42}, function(err, res) {
       clearTimeout(timeout);
@@ -172,7 +172,7 @@ describe('ews module', function() {
     });
     setTimeout(() => {
       wsServer.close();
-    }, 5);
+    }, 10);
     wsServer.onRequest('test', function(data) {
       return new Promise((resolve, reject) => {});
     });
@@ -221,11 +221,10 @@ describe('ews module', function() {
   });
 
   it('should handle timeout errors', endTest => {
-    ws.setResponseTimeout(10);
-
     var gotTimeout = false;
 
-    ws.sendRequest('test1', {code: 42}).then(function(res) {
+    ws.sendRequest('test1', {code: 42}, {responseTimeout: 10})
+    .then(function(res) {
       res.should.equal('foo');
     }).catch(Promise.TimeoutError, function(err) {
       gotTimeout = true;

@@ -311,8 +311,20 @@ describe('ews module', function() {
         endTest();
       });
     });
+    it('should emit close events from client with terminate', endTest => {
+      ws.terminate();
+      wsServer.on('close', function() {
+        endTest();
+      });
+    });
     it('should emit close events from server', endTest => {
       wsServer.close(1000);
+      ws.on('close', function() {
+        endTest();
+      });
+    });
+    it('should emit close events from server with terminate', endTest => {
+      wsServer.terminate();
       ws.on('close', function() {
         endTest();
       });

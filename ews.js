@@ -227,6 +227,10 @@ class WebSocket extends EventEmitter{
   close() {
     this.wsClient.close.apply(this.wsClient, arguments);
   }
+
+  terminate() {
+    this.wsClient.terminate();
+  }
   
   setRemoteErrorHook(hook) {
     this.remoteErrorHook = hook;

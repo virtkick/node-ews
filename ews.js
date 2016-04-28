@@ -146,7 +146,7 @@ class WebSocket extends EventEmitter{
     let requestMap = this.requestMap;
     let responseTimeout = opts.responseTimeout || this.responseTimeout;
     let originalStack = (new Error().stack).replace(/^Error\n/,'');
-    return Promise.resolveDeep(data).then(() => {
+    return Promise.resolveDeep(data).then(data => {
       return (new Promise((resolve, reject) => {
         obj = {
           type: type,

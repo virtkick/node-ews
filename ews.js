@@ -21,41 +21,19 @@ function newCall(Cls, args) {
   return new (Function.prototype.bind.apply(Cls, args));
 }
 
-class WebSocket extends EventEmitter{
-  constructRealError(originalStack, err) {
-    let resolvedError;
-    if(! (err instanceof Error) && err.message && err.stack) {
-      let errInstance = new RemoteError(err.message);
-      errInstance.name = 'Remote::' + err.name;
-      let constructedStack = err.stack + '\n' + 'From previous event:\n' + originalStack;
-      errInstance.stack = constructedStack;
-      if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
-        console.error(errInstance.stack);
-      }
-      resolvedError = errInstance;
-    } else {
-      resolvedError = err;
-    }
-    if(this.remoteErrorHook) {
-      resolvedError = this.remoteErrorHook(resolvedError);
-    }
-    return Promise.resolve(resolvedError);
-  }
-  
-  constructor(wsInstance) {
-    let args = Array.prototype.slice.call(arguments);
+function makeRequestHandler(cb) {
+  return function requestHandler(data, responseCb) {
+    Promise.resolve().then(() => Promise.resolveDeep(cb(data)))
+      .nodeify(responseCb);
+  };
+}
+
+class RequestHandler extends EventEmitter {
+  constructor(messageProvider) {
     super();
-
-    this.responseTimeout = 10000;
-
     let requestMap = this.requestMap  = {};
-
-    if(wsInstance && wsInstance instanceof ws) {
-      this.wsClient = wsInstance;
-    } else {
-      this.wsClient = newCall(ws, args);
-    }
-    this.wsClient.on('message', msg => {
+    
+    messageProvider.on('message', msg => {
       let obj = JSON.parse(msg);
       
       let responseFunction = (error, responseData) => {
@@ -115,25 +93,40 @@ class WebSocket extends EventEmitter{
         this.emit('messageError', err, msg);
       }
     });
-
-    this.wsClient.on('open', () => {
-      this.emit('open');
-    });
-    this.wsClient.on('close', () => {
-      this.emit('close');
-    });
-    this.wsClient.on('error', err => {
-      this.emit('error', err);
-    });
   }
   
-  send(msg, cb) {
-    this.wsClient.send(JSON.stringify(msg), cb);
+  onRequest(name, cb) {
+    this.on('request:'+name, makeRequestHandler(cb));
   }
   
-  isClosed() {
-    return this.wsClient.readyState === ws.CLOSED ||
-      this.wsClient.readyState === ws.CLOSING;
+  onceRequest(name, cb) {
+    this.once('request:'+name, makeRequestHandler(cb));
+  }
+  
+  onEvent(name, cb) {
+    this.on('event:'+name, cb);
+  }
+  
+  onceEvent(name, cb) {
+    this.once('event:'+name, cb);
+  }
+  
+  offEvent(name, cb) {
+    if(cb)
+      this.removeListener('event:' + name, cb);
+    else
+      this.removeAllListeners('event:' + name);
+  }
+  
+  offRequest(name, cb) {
+    if(cb)
+      this.removeListener('request:' + name, cb);
+    else
+      this.removeAllListeners('request:' + name);
+  }
+  
+  send(obj, cb) {
+    cb(new Error('Not implemented'));
   }
   
   sendRequest(type, data, opts, cb) {
@@ -179,37 +172,67 @@ class WebSocket extends EventEmitter{
       .nodeify(cb);
     });
   }
-  
-  onRequest(name, cb) {
-    this.on('request:'+name, makeRequestHandler(cb));
+};
+
+class WebSocket extends RequestHandler {
+  constructRealError(originalStack, err) {
+    let resolvedError;
+    if(! (err instanceof Error) && err.message && err.stack) {
+      let errInstance = new RemoteError(err.message);
+      errInstance.name = 'Remote::' + err.name;
+      let constructedStack = err.stack + '\n' + 'From previous event:\n' + originalStack;
+      errInstance.stack = constructedStack;
+      if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
+        console.error(errInstance.stack);
+      }
+      resolvedError = errInstance;
+    } else {
+      resolvedError = err;
+    }
+    if(this.remoteErrorHook) {
+      resolvedError = this.remoteErrorHook(resolvedError);
+    }
+    return Promise.resolve(resolvedError);
   }
   
-  onceRequest(name, cb) {
-    this.once('request:'+name, makeRequestHandler(cb));
+  constructor(wsInstance) {
+    let args = Array.prototype.slice.call(arguments);
+
+    let wsClient;
+    if(wsInstance && wsInstance instanceof ws) {
+      wsClient = wsInstance;
+    } else {
+      wsClient = newCall(ws, args);
+    }
+
+    super(wsClient);
+
+    this.responseTimeout = 10000;
+
+    let requestMap = this.requestMap;
+
+    this.wsClient = wsClient;
+
+    this.wsClient.on('open', () => {
+      this.emit('open');
+    });
+    this.wsClient.on('close', () => {
+      this.emit('close');
+    });
+    this.wsClient.on('error', err => {
+      this.emit('error', err);
+    });
   }
   
-  onEvent(name, cb) {
-    this.on('event:'+name, cb);
+  send(msg, cb) {
+    this.wsClient.send(JSON.stringify(msg), cb);
   }
   
-  onceEvent(name, cb) {
-    this.once('event:'+name, cb);
+  isClosed() {
+    return this.wsClient.readyState === ws.CLOSED ||
+      this.wsClient.readyState === ws.CLOSING;
   }
-  
-  offEvent(name, cb) {
-    if(cb)
-      this.removeEventListener('event:' + name, cb);
-    else
-      this.removeAllListeners('event:' + name);
-  }
-  
-  offRequest(name, cb) {
-    if(cb)
-      this.removeEventListener('request:' + name, cb);
-    else
-      this.removeAllListeners('request:' + name);
-  }
-    
+      
   setResponseTimeout(timeout) {
     this.responseTimeout = parseInt(timeout);
   }
@@ -235,13 +258,6 @@ class WebSocket extends EventEmitter{
   setRemoteErrorHook(hook) {
     this.remoteErrorHook = hook;
   }
-}
-
-function makeRequestHandler(cb) {
-  return function requestHandler(data, responseCb) {
-    Promise.resolve().then(() => Promise.resolveDeep(cb(data)))
-      .nodeify(responseCb);
-  };
 }
 
 class WebSocketServer extends EventEmitter {
@@ -279,4 +295,5 @@ forwardCallServer('close');
 
 WebSocket.Server = WebSocketServer;
 WebSocket.RemoteError = RemoteError;
+WebSocket.RequestHandler = RequestHandler;
 module.exports = WebSocket;

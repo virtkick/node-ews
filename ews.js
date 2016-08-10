@@ -29,10 +29,39 @@ function makeRequestHandler(cb) {
 }
 
 class RequestHandler extends EventEmitter {
+  constructRealError(originalStack, err) {
+    let resolvedError;
+    if(! (err instanceof Error) && err.message && err.stack) {
+      let errInstance = new RemoteError(err.message);
+      errInstance.name = 'Remote::' + err.name;
+      let constructedStack = err.stack + '\n' + 'From previous event:\n' + originalStack;
+      errInstance.stack = constructedStack;
+      if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
+        console.error(errInstance.stack);
+      }
+      resolvedError = errInstance;
+    } else {
+      resolvedError = err;
+    }
+    if(this.remoteErrorHook) {
+      resolvedError = this.remoteErrorHook(resolvedError);
+    }
+    return Promise.resolve(resolvedError);
+  }
+  
+  isClosed() {
+    return false; // needs to re-implemented by children
+  }
+  
+  setRemoteErrorHook(hook) {
+    this.remoteErrorHook = hook;
+  }
+
   constructor(messageProvider) {
     super();
     let requestMap = this.requestMap  = {};
     
+    this.messageProvider = messageProvider;
     messageProvider.on('message', msg => {
       let obj = JSON.parse(msg);
       
@@ -85,6 +114,7 @@ class RequestHandler extends EventEmitter {
               console.error('Got response without a request', obj.response);
             }
           } else {
+            this.emit('event', obj.type, obj.data);
             this.emit('event:'+obj.type, obj.data);
           }
         }
@@ -126,7 +156,25 @@ class RequestHandler extends EventEmitter {
   }
   
   send(obj, cb) {
-    cb(new Error('Not implemented'));
+    if(this.messageProvider.send) {
+      this.messageProvider.send(JSON.stringify(obj), cb);
+    } else {
+      cb(new Error('Not implemented'));
+    }
+  }
+  
+  setResponseTimeout(timeout) {
+    this.responseTimeout = parseInt(timeout);
+  }
+  
+  sendEvent(type, data, cb) {
+    return (new Promise((resolve, reject) => {
+      let obj = {
+        type: type,
+        data: data
+      };
+      this.send(obj);
+    })).nodeify(cb);
   }
   
   sendRequest(type, data, opts, cb) {
@@ -137,7 +185,7 @@ class RequestHandler extends EventEmitter {
       opts = {};
     }
     let requestMap = this.requestMap;
-    let responseTimeout = opts.responseTimeout || this.responseTimeout;
+    let responseTimeout = opts.responseTimeout || this.responseTimeout || 10000;
     let originalStack = (new Error().stack).replace(/^Error\n/,'');
     return Promise.resolveDeep(data).then(data => {
       return (new Promise((resolve, reject) => {
@@ -175,26 +223,6 @@ class RequestHandler extends EventEmitter {
 };
 
 class WebSocket extends RequestHandler {
-  constructRealError(originalStack, err) {
-    let resolvedError;
-    if(! (err instanceof Error) && err.message && err.stack) {
-      let errInstance = new RemoteError(err.message);
-      errInstance.name = 'Remote::' + err.name;
-      let constructedStack = err.stack + '\n' + 'From previous event:\n' + originalStack;
-      errInstance.stack = constructedStack;
-      if(process.env.EWS_PRINT_REMOTE_REJECTIONS) {
-        console.error(errInstance.stack);
-      }
-      resolvedError = errInstance;
-    } else {
-      resolvedError = err;
-    }
-    if(this.remoteErrorHook) {
-      resolvedError = this.remoteErrorHook(resolvedError);
-    }
-    return Promise.resolve(resolvedError);
-  }
-  
   constructor(wsInstance) {
     let args = Array.prototype.slice.call(arguments);
 
@@ -224,39 +252,17 @@ class WebSocket extends RequestHandler {
     });
   }
   
-  send(msg, cb) {
-    this.wsClient.send(JSON.stringify(msg), cb);
-  }
-  
   isClosed() {
     return this.wsClient.readyState === ws.CLOSED ||
       this.wsClient.readyState === ws.CLOSING;
   }
-      
-  setResponseTimeout(timeout) {
-    this.responseTimeout = parseInt(timeout);
-  }
-  
-  sendEvent(type, data, cb) {
-    return (new Promise((resolve, reject) => {
-      let obj = {
-        type: type,
-        data: data
-      };
-      this.send(obj);
-    })).nodeify(cb);
-  }
-  
+        
   close() {
     this.wsClient.close.apply(this.wsClient, arguments);
   }
 
   terminate() {
     this.wsClient.terminate();
-  }
-  
-  setRemoteErrorHook(hook) {
-    this.remoteErrorHook = hook;
   }
 }
 

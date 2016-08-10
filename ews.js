@@ -33,6 +33,9 @@ class ScopedRequestHandler {
     this.scopeId = scopeId;
     this.masterRequestHandler = masterRequestHandler;
   }
+  destroy() {
+    this.masterRequestHandler.destroyScope(this.scopeId);
+  }
   removeAllListeners() {
     this.masterRequestHandler.eventNames().forEach(eventName => {
       if(eventName.indexOf(`event:${this.scopeId}`) === 0 ||

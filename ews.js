@@ -208,6 +208,14 @@ class RequestHandler extends EventEmitter {
   }
   
   sendEvent(type, data, cb) {
+    if(data && data instanceof Error) {
+      data = {
+        message: data.message,
+        stack: data.stack,
+        name: data.name
+      };
+    }
+    
     let obj = {
       type: type,
       data: data

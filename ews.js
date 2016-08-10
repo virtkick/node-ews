@@ -28,6 +28,28 @@ function makeRequestHandler(cb) {
   };
 }
 
+class ScopedRequestHandler {
+  constructor(masterRequestHandler, scopeId) {
+    this.scopeId = scopeId;
+    this.masterRequestHandler = masterRequestHandler;
+  }
+  removeAllListeners() {
+    this.masterRequestHandler.eventNames().forEach(eventName => {
+      if(eventName.indexOf(`event:${this.scopeId}`) === 0 ||
+        eventName.indexOf(`request:${this.scopeId}`) === 0) {
+          this.masterRequestHandler.removeAllListeners(eventName);
+        }
+    });
+  }
+}
+
+['onRequest', 'onceRequest', 'onEvent', 'onceEvent', 'offEvent',
+'offRequest', 'sendEvent', 'sendRequest'].forEach(methodName => {
+  ScopedRequestHandler.prototype[methodName] = function(name, ...args) {
+    return this.masterRequestHandler[methodName].call(this.masterRequestHandler, `${this.scopeId}:${name}`, ...args);
+  }
+});
+
 class RequestHandler extends EventEmitter {
   constructRealError(originalStack, err) {
     let resolvedError;
@@ -56,9 +78,23 @@ class RequestHandler extends EventEmitter {
   setRemoteErrorHook(hook) {
     this.remoteErrorHook = hook;
   }
+  
+  scope(scopeId) {
+    this.scopes[scopeId] = this.scopes[scopeId] || new ScopedRequestHandler(this, scopeId);
+    return this.scopes[scopeId];
+  }
+  
+  destroyScope(scopeId) {
+    let scope = this.scopes[scopeId];
+    if(scope) {
+      scope.removeAllListeners();
+    }
+    delete this.scopes[scopeId];
+  }
 
   constructor(messageProvider) {
     super();
+    this.scopes = {};
     let requestMap = this.requestMap  = {};
     
     this.messageProvider = messageProvider;
@@ -100,6 +136,7 @@ class RequestHandler extends EventEmitter {
               responseFunction(new Error('No handler for request: ' + obj.type));
             } else {
               this.emit('request:'+obj.type, obj.data, responseFunction);
+              this.emit('request', obj.type, obj.data, responseFunction);
             }
           } else if(obj.response) {
             if(requestMap[obj.response]) {
@@ -168,13 +205,11 @@ class RequestHandler extends EventEmitter {
   }
   
   sendEvent(type, data, cb) {
-    return (new Promise((resolve, reject) => {
-      let obj = {
-        type: type,
-        data: data
-      };
-      this.send(obj);
-    })).nodeify(cb);
+    let obj = {
+      type: type,
+      data: data
+    };
+    this.send(obj, cb);
   }
   
   sendRequest(type, data, opts, cb) {

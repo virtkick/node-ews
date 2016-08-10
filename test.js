@@ -8,6 +8,8 @@ var Promise = require('bluebird').Promise;
 Promise.longStackTraces();
 
 var WebSocket = require('./ews');
+let RequestHandler = require('./ews').RequestHandler;
+let EventEmitter = require('events').EventEmitter;
 
 describe('ews module', function() {
   var ws, wss, wsServer, cancelRequestCheck;
@@ -344,4 +346,64 @@ describe('ews module', function() {
       wsServer.close(0);
     });
   });
+  
+  describe('RequestHandler', function() {
+    let emitter, requestHandler;
+    before(() => {
+      emitter = new EventEmitter();
+
+      emitter.send = function(obj, cb) {
+        emitter.emit('message', obj);
+        if(cb) cb();
+      };
+      requestHandler = new RequestHandler(emitter);
+    })
+    function emitMessage(type, data) {
+      
+    }
+    
+    it('should emit event', endTest => {
+      requestHandler.onEvent('test', () => {
+        endTest();
+      })
+      requestHandler.sendEvent('test', 'foo');
+    });
+    
+    
+    it('should emit scoped event', endTest => {
+      let scoped = requestHandler.scope('foobar');
+      
+      scoped.onEvent('test', () => {
+        endTest();
+      })
+      requestHandler.sendEvent('foobar:test', 'foo');
+    });
+    
+    it('should not emit scoped event', endTest => {
+      let scoped = requestHandler.scope('foobar');
+      
+      scoped.onEvent('test', () => {
+        endTest();
+      })
+      scoped.removeAllListeners();
+      scoped.onEvent('test2', data => {
+        data.should.equal('foo');
+        endTest();
+      })
+      scoped.sendEvent('test2', 'foo');
+    });
+    
+    it('should handle requests', endTest => {
+      let scoped = requestHandler.scope('foobar');
+      scoped.onRequest('test', () => {
+        return 'bar';
+      });
+      scoped.sendRequest('test').then(data => {
+        data.should.equal('bar');
+        endTest();
+      })
+    });
+    
+  });
+  
 });

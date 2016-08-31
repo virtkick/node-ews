@@ -1,6 +1,6 @@
 {
   "name": "ews",
-  "version": "1.2.9",
+  "version": "1.3.0",
   "description": "Extended web wockets based on ws module. Provides more events and response capability.",
   "main": "ews.js",
   "scripts": {
@@ -26,13 +26,11 @@
   },
   "homepage": "https://github.com/virtkick/node-ews",
   "dependencies": {
-    "bluebird": "^3.1.1",
-    "node-uuid": "^1.4.3",
-    "promise-resolve-deep": "^1.0.3",
-    "uws": "^0.5.1",
-    "ws": "^1.0.1"
+    "exchannel": "^1.0.1",
+    "ws": "^1.1.1"
   },
   "devDependencies": {
+    "bluebird": "^3.4.4",
     "chai": "^2.1.2",
     "mocha": "^2.2.1",
     "should": "^5.2.0"

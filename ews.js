@@ -1,4 +1,4 @@
-let ExChannel = require('exchannel');
+let {ExChannel, RemoteError} = require('exchannel');
 let {EventEmitter} = require('events');
 let RealWebSocket = require('ws');
 
@@ -80,6 +80,6 @@ function forwardCallServer(name) {
 forwardCallServer('close');
 
 WebSocket.Server = WebSocketServer;
-WebSocket.RemoteError = ExChannel.RemoteError;
+WebSocket.RemoteError = RemoteError;
 WebSocket.RequestHandler = ExChannel;
 module.exports = WebSocket;

@@ -3,7 +3,7 @@
 require('should');
 var assert = require('chai').assert;
 
-var Promise = require('bluebird').Promise;
+var Promise = require('bluebird');
 
 Promise.longStackTraces();
 
